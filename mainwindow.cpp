@@ -7,6 +7,7 @@
 #include <QListView>
 #include <QTimerEvent>
 #include <QSet>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWindow){
     ui->setupUi(this);
@@ -21,6 +22,8 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent), ui(new Ui::MainWin
         qDebug() << "Servidor escutando na porta 1234";
         connect(tcpServer, &QTcpServer::newConnection, this, &MainWindow::novaConexao);
     }
+    timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &MainWindow::coletarDados);
 
     connect(ui->connectButton, &QPushButton::clicked, this, &MainWindow::conectarServidor);    // "Connect"
     connect(ui->disconnectButton, &QPushButton::clicked, this, &MainWindow::desconectarServidor); // "Disconnect"
@@ -92,15 +95,51 @@ void MainWindow::novaConexao()
 }
 
 void MainWindow::iniciarColeta(){
+    if (socket->state() == QAbstractSocket::ConnectedState) {
+        timer->start(1000);  // Inicia a coleta a cada 1 segundo
+        qDebug() << "Coleta iniciada";
+        QMessageBox::information(this, "Coleta", "Coleta de dados iniciada.");
+    } else {
+        QMessageBox::warning(this, "Erro", "Conecte-se ao servidor antes de iniciar a coleta.");
+    }
 }
 
 void MainWindow::pararColeta(){
-
+    if (timer->isActive()) {
+        timer->stop();  // Para o temporizador
+        qDebug() << "Coleta parada";
+        QMessageBox::information(this, "Coleta", "Coleta de dados parada.");
+    } else {
+        QMessageBox::information(this, "Aviso", "A coleta já está parada.");
+    }
 }
 
 void MainWindow::coletarDados(){
+    if (socket->state() != QAbstractSocket::ConnectedState) {
+        qDebug() << "Não conectado ao servidor. Coleta cancelada.";
+        return;
+    }
 
-    atualizarGrafico();
+    socket->write("get\r\n");  // Envia comando para obter o dado (ajuste conforme seu protocolo)
+    socket->flush();
+
+    if (!socket->waitForReadyRead(1000)) {  // Aguarda resposta do servidor
+        qDebug() << "Nenhum dado recebido.";
+        return;
+    }
+
+    while (socket->canReadLine()) {
+        QString linha = socket->readLine().trimmed();  // Lê e remove espaços e \n
+        bool ok;
+        double valor = linha.toDouble(&ok);
+
+        if (ok) {
+            qDebug() << "Valor recebido:" << valor;
+            atualizarGrafico();
+        } else {
+            qDebug() << "Valor inválido recebido:" << linha;
+        }
+    }
 }
 
 void MainWindow::atualizarGrafico(){

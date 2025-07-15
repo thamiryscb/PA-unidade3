@@ -7,6 +7,7 @@
 #include <QTcpServer>
 #include <QStringListModel>
 #include <QSet>
+#include <QTimer>
 
 namespace Ui {
 class MainWindow;
@@ -38,6 +39,7 @@ private:
     QStringListModel *model;
     QStringList list;
     QSet<QString> listaIps;
+    QTimer *timer;
 
     void atualizarGrafico();
 };
